@@ -4,7 +4,6 @@
 #include <functional>
 #include <mutex>
 #include <optional>
-#include <thread>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -75,6 +74,46 @@ public:
   CallAtDestruction(std::function<void()> _fn) : fn(_fn) {}
 
   ~CallAtDestruction() { fn(); }
+};
+
+class Ctx;
+using CtxRef = Ctx const *;
+
+class Ctx {
+  static std::mutex ctxMutex;
+  static std::vector<CtxRef> contextRefs;
+  static CallAtDestruction deleter;
+
+  Ctx(VkPhysicalDevice _physical, VkDevice _logical, VkQueue _graphicsQueue,
+      VkCommandPool _commandPool)
+      : physical(_physical), logical(_logical), graphicsQueue(_graphicsQueue),
+        commandPool(_commandPool) {}
+
+public:
+  VkPhysicalDevice physical;
+  VkDevice logical;
+  VkQueue graphicsQueue;
+  VkCommandPool commandPool;
+
+  static CtxRef create(VkPhysicalDevice physical, VkDevice logical,
+                       VkQueue graphicsQueue, VkCommandPool commandPool) {
+    auto res = new Ctx(physical, logical, graphicsQueue, commandPool);
+    while (!ctxMutex.try_lock()) {
+    }
+    contextRefs.push_back(res);
+    ctxMutex.unlock();
+    return res;
+  }
+};
+
+class WithCtx {
+protected:
+  CtxRef ctx;
+
+  WithCtx(CtxRef _ctx) : ctx(_ctx) {}
+
+public:
+  use CtxRef get_ctx() const { return ctx; }
 };
 
 } // namespace vk
