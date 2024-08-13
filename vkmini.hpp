@@ -20,6 +20,7 @@ template <typename T> using Maybe = std::optional<T>;
 enum VkMiniError {
   VKMINI_NO_ERROR = 0,
 
+  VKMINI_BUFFER_SIZE_MISMATCH,
   VKMINI_FAILED_TO_CREATE_BUFFER,
   VKMINI_FAILED_TO_ALLOCATE_BUFFER_MEMORY,
 
@@ -119,6 +120,56 @@ public:
 // Can return error VKMINI_FAILED_TO_FIND_SUITABLE_MEMORY_TYPE
 use Result<u32> find_memory_type(CtxRef ctx, u32 typeFilter,
                                  VkMemoryPropertyFlags properties);
+
+class Buffer : public WithCtx {
+  VkDeviceSize size;
+  VkBuffer buffer;
+  VkDeviceMemory memory;
+  void *mapping;
+
+  Buffer(CtxRef _ctx, VkDeviceSize _size, VkBuffer _buffer,
+         VkDeviceMemory _memory)
+      : WithCtx(_ctx), size(_size), buffer(_buffer), memory(_memory) {}
+
+public:
+  // Can return errors:
+  // VKMINI_FAILED_TO_CREATE_BUFFER,
+  // VKMINI_FAILED_TO_ALLOCATE_BUFFER_MEMORY
+  use static Result<Buffer, ErrorDetail> create(CtxRef ctx, VkDeviceSize size,
+                                                VkBufferUsageFlags usage,
+                                                VkMemoryPropertyFlags flags);
+
+  use VkDeviceSize get_size() const { return size; }
+  use VkBuffer get_buffer() const { return buffer; }
+  use VkDeviceMemory get_memory() const { return memory; }
+
+  use bool is_memory_mapped() const { return mapping != nullptr; }
+  use VkResult map_memory();
+  void unmap_memory();
+
+  // Can return error VKMINI_FAILED_TO_MAP_MEMORY
+  use ErrorDetail copy_data(void *data);
+
+  // Can return errors:
+  // VKMINI_BUFFER_SIZE_MISMATCH,
+  // VKMINI_FAILED_TO_ALLOCATE_COMMAND_BUFFER,
+  // VKMINI_FAILED_TO_BEGIN_COMMAND_BUFFER,
+  // VKMINI_FAILED_TO_END_COMMAND_BUFFER,
+  // VKMINI_FAILED_TO_SUBMIT_COMMAND_BUFFER,
+  // VKMINI_FAILED_WAITING_FOR_QUEUE_TO_FINISH
+  use ErrorDetail copy_to_vk(VkBuffer destination) const;
+
+  // Can return errors:
+  // VKMINI_BUFFER_SIZE_MISMATCH,
+  // VKMINI_FAILED_TO_ALLOCATE_COMMAND_BUFFER,
+  // VKMINI_FAILED_TO_BEGIN_COMMAND_BUFFER,
+  // VKMINI_FAILED_TO_END_COMMAND_BUFFER,
+  // VKMINI_FAILED_TO_SUBMIT_COMMAND_BUFFER,
+  // VKMINI_FAILED_WAITING_FOR_QUEUE_TO_FINISH
+  use ErrorDetail copy_to(Buffer destination) const;
+
+  ~Buffer();
+};
 
 } // namespace vk
 
