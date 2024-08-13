@@ -116,6 +116,10 @@ public:
   use CtxRef get_ctx() const { return ctx; }
 };
 
+// Can return error VKMINI_FAILED_TO_FIND_SUITABLE_MEMORY_TYPE
+use Result<u32> find_memory_type(CtxRef ctx, u32 typeFilter,
+                                 VkMemoryPropertyFlags properties);
+
 } // namespace vk
 
 #endif
