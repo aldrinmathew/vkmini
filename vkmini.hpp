@@ -29,6 +29,14 @@ enum VkMiniError {
   VKMINI_FAILED_WAITING_FOR_QUEUE_TO_FINISH,
 };
 
+struct ErrorDetail {
+  VkResult vulkan;
+  VkMiniError vkMini;
+
+  use bool is_ok() const { return vkMini == VKMINI_NO_ERROR; }
+  use operator bool() const { return is_ok(); }
+};
+
 } // namespace vk
 
 #endif
