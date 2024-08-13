@@ -68,6 +68,15 @@ public:
   use operator bool() { return is_ok(); }
 };
 
+class CallAtDestruction {
+  std::function<void()> fn;
+
+public:
+  CallAtDestruction(std::function<void()> _fn) : fn(_fn) {}
+
+  ~CallAtDestruction() { fn(); }
+};
+
 } // namespace vk
 
 #endif
