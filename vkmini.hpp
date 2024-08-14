@@ -234,8 +234,57 @@ public:
   ~BufferTy();
 };
 
-class Deleter {
-  static CallAtDestruction deleter;
+class CommandBufferTy;
+using CommandBuffer = CommandBufferTy const *;
+
+enum class CommandBufferState {
+  BEGUN,
+  RECORDING,
+  END,
+  NONE,
+};
+
+class CommandBufferTy : public WithCtx {
+  friend class CtxTy;
+  static Vec<CommandBuffer> allCommandBuffers;
+
+  VkCommandBuffer buffer;
+  CommandBufferState state;
+
+  CommandBufferTy(Ctx _ctx, VkCommandBuffer _buffer)
+      : WithCtx(_ctx), buffer(_buffer) {}
+
+public:
+  /// Create a `CommandBuffer`
+  /// Can return error `VKMINI_FAILED_TO_ALLOCATE_COMMAND_BUFFER`
+  use static Result<CommandBuffer, ErrorPair>
+  create(Ctx ctx, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+
+  /// Get the underlying `VkCommandBuffer`
+  use VkCommandBuffer get_buffer() const { return buffer; }
+
+  /// Begin the CommandBuffer. This prepares for commands to be recorded.
+  use ErrorPair begin(VkCommandBufferUsageFlags beginFlags = 0);
+
+  /// Record commands to the buffer. The commands won't be executed.
+  use VkMiniError record(std::function<void(VkCommandBuffer)> callback);
+
+  /// End recording to the command buffer
+  use ErrorPair end();
+
+  /// Submit the command buffer to the graphics queue
+  use ErrorPair submit(VkQueue graphicsQueue, Maybe<VkFence> fence = None);
+
+  /// Perform all commands as part of the callback function and submit the
+  /// commands to the graphics queue.
+  /// This begins the command buffer, records to it, ends it and then submits
+  /// the commands to the queue.
+  use ErrorPair perform(std::function<void(VkCommandBuffer)> callback,
+                        VkQueue graphicsQueue,
+                        VkCommandBufferUsageFlags beginFlags = 0,
+                        VkFence fence = VK_NULL_HANDLE);
+
+  ~CommandBufferTy();
 };
 
 } // namespace vk

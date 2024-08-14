@@ -172,4 +172,132 @@ BufferTy::~BufferTy() {
   vkFreeMemory(ctx->logical, memory, nullptr);
 }
 
+Result<CommandBuffer, ErrorPair>
+CommandBufferTy::create(Ctx ctx, VkCommandBufferLevel level) {
+  VkCommandBufferAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.commandPool = ctx->commandPool;
+  allocInfo.level = level;
+  allocInfo.commandBufferCount = 1;
+  VkCommandBuffer buffer;
+  auto res = vkAllocateCommandBuffers(ctx->logical, &allocInfo, &buffer);
+  if (res != VK_SUCCESS) {
+    return Result<CommandBuffer, ErrorPair>::Error(
+        {res, VKMINI_FAILED_TO_ALLOCATE_COMMAND_BUFFER});
+  }
+  auto bufferResult = new CommandBufferTy(ctx, buffer);
+
+  VKMINI_INSIDE_LOCK(allCommandBuffers.push_back(bufferResult);)
+
+  return Result<CommandBuffer, ErrorPair>::Ok(bufferResult);
+}
+
+ErrorPair CommandBufferTy::begin(VkCommandBufferUsageFlags flags) {
+  switch (state) {
+  case CommandBufferState::NONE: {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = flags;
+    beginInfo.pInheritanceInfo = nullptr;
+    auto res = vkBeginCommandBuffer(buffer, &beginInfo);
+    if (res == VK_SUCCESS) {
+      state = CommandBufferState::BEGUN;
+      return {res, VKMINI_NO_ERROR};
+    }
+    return {res, VKMINI_FAILED_TO_BEGIN_COMMAND_BUFFER};
+  }
+  case CommandBufferState::BEGUN:
+    return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_ALREADY_BEGUN};
+  case CommandBufferState::END:
+    return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_ALREADY_ENDED};
+  case CommandBufferState::RECORDING:
+    return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_ALREADY_RECORDING};
+  }
+}
+
+VkMiniError
+CommandBufferTy::record(std::function<void(VkCommandBuffer)> callback) {
+  switch (state) {
+  case CommandBufferState::RECORDING:
+  case CommandBufferState::BEGUN: {
+    callback(buffer);
+    state = CommandBufferState::RECORDING;
+    return VKMINI_NO_ERROR;
+  }
+  case CommandBufferState::END:
+    return VKMINI_COMMAND_BUFFER_ALREADY_ENDED;
+  case CommandBufferState::NONE:
+    return VKMINI_COMMAND_BUFFER_HAS_NOT_BEGUN;
+  }
+}
+
+ErrorPair CommandBufferTy::end() {
+  switch (state) {
+  case CommandBufferState::BEGUN:
+  case CommandBufferState::RECORDING: {
+    auto res = vkEndCommandBuffer(buffer);
+    if (res == VK_SUCCESS) {
+      state = CommandBufferState::END;
+      return {res, VKMINI_NO_ERROR};
+    }
+    return {res, VKMINI_FAILED_TO_END_COMMAND_BUFFER};
+  }
+  case CommandBufferState::END:
+    return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_ALREADY_ENDED};
+  case CommandBufferState::NONE:
+    return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_HAS_NOT_BEGUN};
+  }
+}
+
+ErrorPair CommandBufferTy::submit(VkQueue graphicsQueue, Maybe<VkFence> fence) {
+  switch (state) {
+  case CommandBufferState::END: {
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &buffer;
+    auto res =
+        vkQueueSubmit(graphicsQueue, 1, &submitInfo,
+                      fence.has_value() ? fence.value() : VK_NULL_HANDLE);
+    if (res == VK_SUCCESS) {
+      state = CommandBufferState::NONE;
+      return {VK_SUCCESS, VKMINI_NO_ERROR};
+    }
+    return {res, VKMINI_FAILED_TO_SUBMIT_COMMAND_BUFFER};
+  }
+  case CommandBufferState::BEGUN:
+  case CommandBufferState::RECORDING:
+    return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_HAS_NOT_END};
+  case CommandBufferState::NONE:
+    return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_NOTHING_TO_SUBMIT};
+  }
+} // namespace vk
+
+ErrorPair
+CommandBufferTy::perform(std::function<void(VkCommandBuffer)> callback,
+                         VkQueue graphicsQueue, VkCommandBufferUsageFlags flags,
+                         VkFence fence) {
+  auto resPair = begin(flags);
+  if (resPair.vulkan != VK_SUCCESS) {
+    return resPair;
+  }
+  auto res = record(callback);
+  if (res != VKMINI_NO_ERROR) {
+    return {VK_ERROR_UNKNOWN, res};
+  }
+  resPair = end();
+  if (resPair.vulkan != VK_SUCCESS) {
+    return resPair;
+  }
+  resPair = submit(graphicsQueue, fence);
+  if (resPair.vulkan != VK_SUCCESS) {
+    return resPair;
+  }
+  return {VK_SUCCESS, VKMINI_NO_ERROR};
+}
+
+CommandBufferTy::~CommandBufferTy() {
+  vkFreeCommandBuffers(ctx->logical, ctx->commandPool, 1, &buffer);
+}
+
 } // namespace vk
