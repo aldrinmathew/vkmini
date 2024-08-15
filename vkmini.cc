@@ -5,9 +5,9 @@
 namespace vk {
 
 VKMINI_IF_MULTITHREAD(std::mutex CtxTy::globalMutex{};)
-Vec<Ctx> CtxTy::allContexts{};
-Vec<Buffer> BufferTy::allBuffers{};
-Vec<CommandBuffer> CommandBufferTy::allCommandBuffers{};
+std::vector<Ctx> CtxTy::allContexts{};
+std::vector<Buffer> BufferTy::allBuffers{};
+std::vector<CommandBuffer> CommandBufferTy::allCommandBuffers{};
 
 void CtxTy::cleanup() {
   VKMINI_INSIDE_LOCK({
@@ -25,11 +25,11 @@ void CtxTy::cleanup() {
 
 void cleanup() { CtxTy::cleanup(); }
 
-Maybe<u32> find_memory_type(Ctx ctx, u32 typeFilter,
-                            VkMemoryPropertyFlags properties) {
+std::optional<uint32_t> find_memory_type(Ctx ctx, uint32_t typeFilter,
+                                         VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceMemoryProperties memProperties;
   vkGetPhysicalDeviceMemoryProperties(ctx->physical, &memProperties);
-  for (u32 i = 0; i < memProperties.memoryTypeCount; i++) {
+  for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
     if ((typeFilter & (1 << i)) &&
         ((memProperties.memoryTypes[i].propertyFlags & properties) ==
          properties)) {
@@ -213,6 +213,7 @@ ErrorPair CommandBufferTy::begin(VkCommandBufferUsageFlags flags) {
   case CommandBufferState::RECORDING:
     return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_ALREADY_RECORDING};
   }
+  return {VK_SUCCESS, VKMINI_NO_ERROR};
 }
 
 VkMiniError
@@ -229,6 +230,7 @@ CommandBufferTy::record(std::function<void(VkCommandBuffer)> callback) {
   case CommandBufferState::NONE:
     return VKMINI_COMMAND_BUFFER_HAS_NOT_BEGUN;
   }
+  return VKMINI_NO_ERROR;
 }
 
 ErrorPair CommandBufferTy::end() {
@@ -247,9 +249,11 @@ ErrorPair CommandBufferTy::end() {
   case CommandBufferState::NONE:
     return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_HAS_NOT_BEGUN};
   }
+  return {VK_SUCCESS, VKMINI_NO_ERROR};
 }
 
-ErrorPair CommandBufferTy::submit(VkQueue graphicsQueue, Maybe<VkFence> fence) {
+ErrorPair CommandBufferTy::submit(VkQueue graphicsQueue,
+                                  std::optional<VkFence> fence) {
   switch (state) {
   case CommandBufferState::END: {
     VkSubmitInfo submitInfo{};
@@ -271,7 +275,8 @@ ErrorPair CommandBufferTy::submit(VkQueue graphicsQueue, Maybe<VkFence> fence) {
   case CommandBufferState::NONE:
     return {VK_ERROR_UNKNOWN, VKMINI_COMMAND_BUFFER_NOTHING_TO_SUBMIT};
   }
-} // namespace vk
+  return {VK_SUCCESS, VKMINI_NO_ERROR};
+}
 
 ErrorPair
 CommandBufferTy::perform(std::function<void(VkCommandBuffer)> callback,

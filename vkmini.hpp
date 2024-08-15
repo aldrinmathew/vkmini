@@ -29,9 +29,6 @@
 namespace vk {
 
 static const auto None = std::nullopt;
-using u32 = uint32_t;
-template <typename T> using Maybe = std::optional<T>;
-template <typename T> using Vec = std::vector<T>;
 
 /// Always call this function before quitting the program, before cleaning up
 /// other Vulkan resources created by you
@@ -108,7 +105,7 @@ using Ctx = CtxTy const *;
 class CtxTy {
   friend class BufferTy;
   friend class CommandBufferTy;
-  static Vec<Ctx> allContexts;
+  static std::vector<Ctx> allContexts;
   VKMINI_IF_MULTITHREAD(static std::mutex globalMutex;)
 
   CtxTy(VkPhysicalDevice _physical, VkDevice _logical, VkQueue _graphicsQueue,
@@ -149,15 +146,15 @@ public:
 /// Potential `typeFilter` value can be the `memoryTypeBits` field of
 /// `VkMemoryRequirements` which is obtained using
 /// `vkGetBufferMemoryRequirements`
-use Maybe<u32> find_memory_type(Ctx ctx, u32 typeFilter,
-                                VkMemoryPropertyFlags properties);
+use std::optional<uint32_t> find_memory_type(Ctx ctx, uint32_t typeFilter,
+                                             VkMemoryPropertyFlags properties);
 
 class BufferTy;
 using Buffer = BufferTy const *;
 
 class BufferTy : public WithCtx {
   friend class CtxTy;
-  static Vec<Buffer> allBuffers;
+  static std::vector<Buffer> allBuffers;
 
   VkDeviceSize size;
   VkBuffer buffer;
@@ -246,7 +243,7 @@ enum class CommandBufferState {
 
 class CommandBufferTy : public WithCtx {
   friend class CtxTy;
-  static Vec<CommandBuffer> allCommandBuffers;
+  static std::vector<CommandBuffer> allCommandBuffers;
 
   VkCommandBuffer buffer;
   CommandBufferState state;
@@ -273,7 +270,8 @@ public:
   use ErrorPair end();
 
   /// Submit the command buffer to the graphics queue
-  use ErrorPair submit(VkQueue graphicsQueue, Maybe<VkFence> fence = None);
+  use ErrorPair submit(VkQueue graphicsQueue,
+                       std::optional<VkFence> fence = None);
 
   /// Perform all commands as part of the callback function and submit the
   /// commands to the graphics queue.
