@@ -83,18 +83,41 @@ template <typename T, typename E = VkMiniError> struct Result {
                  : std::variant<T, E>(std::in_place_index<1>, error.value())) {}
 
 public:
+  /// Create `Result` containing a successful value
   use static Result Ok(T value) { return Result(value, None); }
+
+  /// Create `Result` containing error
   use static Result Error(E error) { return Result(None, error); }
 
+  /// Whether this `Result` is successful and contains a valid value
   use bool is_ok() { return data.index() == 0; }
-  use T get_value() && { return std::get<T>(data); }
-  use T &get_value() & { return std::get<T>(data); }
-  use T const &get_value() const & { return std::get<T>(data); }
 
-  use bool is_error() { return !is_ok(); }
-  use E get_error() && { return std::get<E>(data); }
-  use E &get_error() & { return std::get<E>(data); }
-  use E const &get_error() const & { return std::get<E>(data); }
+  /// Get the value if this `Result` is successful.
+  /// Call this function after making sure that `is_ok` returns `true`
+  use T get_value() && { return std::get<0>(data); }
+
+  /// Get a reference to the value if this `Result` is successful.
+  /// Call this function after making sure that `is_ok` returns `true`
+  use T &get_value() & { return std::get<0>(data); }
+
+  /// Get a const-reference to the value if this result is successful
+  /// Call this function after making sure that `is_ok` returns `true`
+  use T const &get_value() const & { return std::get<0>(data); }
+
+  /// Whether this `Result` has error
+  use bool is_error() { return data.index() == 1; }
+
+  /// Get the error value if this `Result` has an error.
+  /// Call this function after making sure that `is_ok` returns `false`
+  use E get_error() && { return std::get<1>(data); }
+
+  /// Get a reference to the error if this `Result` has an error.
+  /// Call this function after making sure that `is_ok` returns `false`
+  use E &get_error() & { return std::get<1>(data); }
+
+  /// Get a const-reference to the error if this `Result` has an error.
+  /// Call this function after making sure that `is_ok` returns `false`
+  use E const &get_error() const & { return std::get<1>(data); }
 };
 
 class CtxTy;
