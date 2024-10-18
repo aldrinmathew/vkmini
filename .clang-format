@@ -1,4 +1,3 @@
-#// clang-format off
 ---
 Language: Cpp
 BasedOnStyle: LLVM

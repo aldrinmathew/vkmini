@@ -1,6 +1,20 @@
 #ifndef VK_HELPER_HPP
 #define VK_HELPER_HPP
 
+#ifndef VKMINI_MULTITHREAD
+#define VKMINI_MULTITHREAD true
+#endif
+
+#if VKMINI_MULTITHREAD
+#define VKMINI_IF_MULTITHREAD(x) x
+#define VKMINI_INSIDE_LOCK(x)                                                                                          \
+	while (!Ctx::globalMutex.try_lock()) {                                                                               \
+	}                                                                                                                    \
+	x Ctx::globalMutex.unlock();
+#else
+#define VKMINI_IF_MULTITHREAD(x)
+#define VKMINI_INSIDE_LOCK(x) x
+#endif
 #include <cstdint>
 #include <filesystem>
 #include <map>

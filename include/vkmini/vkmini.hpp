@@ -1,19 +1,9 @@
 #ifndef VK_HPP
 #define VK_HPP
 
-#ifndef VKMINI_MULTITHREAD
-#define VKMINI_MULTITHREAD true
-#endif
+#include <vkmini/helper.hpp>
 
 #if VKMINI_MULTITHREAD
-#define VKMINI_IF_MULTITHREAD(x) x
-#define VKMINI_INSIDE_LOCK(x)                                                                                          \
-	while (!CtxTy::globalMutex.try_lock()) {                                                                             \
-	}                                                                                                                    \
-	x CtxTy::globalMutex.unlock();
-#else
-#define VKMINI_IF_MULTITHREAD(x)
-#define VKMINI_INSIDE_LOCK(x) x
 #endif
 
 #include <functional>

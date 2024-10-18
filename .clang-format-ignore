@@ -1,5 +1,0 @@
-#// clang-format off
-.clang-format-ignore
-.clang-format
-!*.cc
-!*.hpp
